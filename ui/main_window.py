@@ -5,6 +5,7 @@
 """
 
 import sys
+import platform
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QScrollArea, QFrame, QSizePolicy, QApplication, QGraphicsDropShadowEffect,
@@ -28,6 +29,11 @@ from utils.formatters import (
     format_rate, format_connection_status,
     get_ip_type, truncate_string, get_process_icon_name
 )
+
+# 平台检测
+IS_LINUX = platform.system() == 'Linux'
+IS_WINDOWS = platform.system() == 'Windows'
+IS_MACOS = platform.system() == 'Darwin'
 from utils.geoip import get_service_by_port
 
 
@@ -112,9 +118,15 @@ class HeaderBar(QWidget):
         self.sort_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         layout.addWidget(self.sort_btn)
         
-        # 主题切换按钮
-        self.theme_btn = QLabel("🌙")
-        self.theme_btn.setFont(Fonts.get_font(14))
+        # 主题切换按钮 - Linux 使用文字，Windows/Mac 使用 emoji
+        if IS_LINUX:
+            self._use_emoji_theme = False
+            self.theme_btn = QLabel("Dark")
+            self.theme_btn.setFont(Fonts.CAPTION())
+        else:
+            self._use_emoji_theme = True
+            self.theme_btn = QLabel("🌙")
+            self.theme_btn.setFont(Fonts.get_font(14))
         self.theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.theme_btn.setToolTip("切换主题")
         layout.addWidget(self.theme_btn)
@@ -136,7 +148,12 @@ class HeaderBar(QWidget):
         if not self._has_update:
             self.update_btn.setStyleSheet(btn_style)
         
-        self.theme_btn.setText("☀️" if theme == 'light' else "🌙")
+        # 主题按钮文字
+        if self._use_emoji_theme:
+            self.theme_btn.setText("☀️" if theme == 'light' else "🌙")
+        else:
+            self.theme_btn.setText("Light" if theme == 'light' else "Dark")
+            self.theme_btn.setStyleSheet(btn_style)
         
         if self._has_update:
             self.update_btn.setText("🛡 更新 ●")
@@ -860,7 +877,7 @@ class MainContent(QWidget):
         
         bottom_layout.addStretch()
         
-        self.version_label = QLabel("NetSentry v1.6.4")
+        self.version_label = QLabel("NetSentry v1.7.1")
         self.version_label.setFont(Fonts.SMALL())
         bottom_layout.addWidget(self.version_label)
         
@@ -1142,8 +1159,35 @@ class NetSentryWindow(QMainWindow):
         if event.button() == Qt.MouseButton.LeftButton:
             pos = event.position().toPoint()
             edge = self._get_resize_edge(pos)
+            
+            # Linux 特殊处理：使用系统级窗口操作
+            if IS_LINUX and edge:
+                wh = self.windowHandle()
+                if wh:
+                    edge_flags = Qt.Edge(0)
+                    if 'left' in edge:
+                        edge_flags |= Qt.Edge.LeftEdge
+                    if 'right' in edge:
+                        edge_flags |= Qt.Edge.RightEdge
+                    if 'top' in edge:
+                        edge_flags |= Qt.Edge.TopEdge
+                    if 'bottom' in edge:
+                        edge_flags |= Qt.Edge.BottomEdge
+                    if edge_flags:
+                        wh.startSystemResize(edge_flags)
+                        return
+            
+            if IS_LINUX and pos.y() <= self.header_bar.height():
+                wh = self.windowHandle()
+                if wh:
+                    wh.startSystemMove()
+                    self._unhide()
+                    return
+            
+            # Windows/macOS 原有逻辑
             if edge:
-                self._is_resizing, self._resize_edge = True, edge
+                self._is_resizing = True
+                self._resize_edge = edge
                 self._resize_start_pos = event.globalPosition().toPoint()
                 self._resize_start_geometry = self.geometry()
                 return
@@ -1155,6 +1199,17 @@ class NetSentryWindow(QMainWindow):
     
     def mouseMoveEvent(self, event):
         pos = event.position().toPoint()
+        
+        # Linux 上系统处理移动和调整大小，只需要设置光标
+        if IS_LINUX:
+            edge = self._get_resize_edge(pos)
+            if edge:
+                self.setCursor(self._get_cursor_for_edge(edge))
+            else:
+                self.setCursor(Qt.CursorShape.ArrowCursor)
+            return
+        
+        # Windows/macOS 使用原有逻辑
         if self._is_resizing:
             delta = event.globalPosition().toPoint() - self._resize_start_pos
             geo = self._resize_start_geometry
