@@ -41,6 +41,10 @@ SORT_BY_CONNECTIONS = 1
 SORT_BY_PROCESS_NAME = 2
 SORT_BY_PID = 3
 
+IS_LINUX = platform.system() == 'Linux'
+IS_WINDOWS = platform.system() == 'Windows'
+IS_MACOS = platform.system() == 'Darwin'
+
 
 class UpdateWorker(QThread):
     """后台更新威胁库的工作线程"""
@@ -69,6 +73,7 @@ class HeaderBar(QWidget):
     refresh_interval_changed = pyqtSignal(float)
     theme_changed = pyqtSignal(str)
     update_requested = pyqtSignal()
+    drag_requested = pyqtSignal(QPoint)
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -225,6 +230,9 @@ class HeaderBar(QWidget):
             elif self.update_btn.geometry().contains(pos):
                 self.update_requested.emit()
                 return
+            
+            self.drag_requested.emit(event.globalPosition().toPoint())
+            return
         
         super().mousePressEvent(event)
     
@@ -1054,6 +1062,7 @@ class NetSentryWindow(QMainWindow):
         self.header_bar.refresh_interval_changed.connect(self._on_refresh_interval_changed)
         self.header_bar.theme_changed.connect(self._on_theme_changed)
         self.header_bar.update_requested.connect(self._on_update_requested)
+        self.header_bar.drag_requested.connect(self._start_window_drag)
         self.main_layout.addWidget(self.header_bar)
         
         self.main_content = MainContent()
@@ -1142,6 +1151,18 @@ class NetSentryWindow(QMainWindow):
     def _on_refresh_interval_changed(self, seconds: float): self.main_content.set_refresh_interval(seconds)
     def _force_refresh(self): self.main_content._refresh_data()
     def _quit_app(self): QApplication.quit()
+    
+    def _start_window_drag(self, global_pos: QPoint):
+        self._unhide()
+        handle = self.windowHandle()
+        
+        # Linux/Wayland handles frameless window dragging more reliably through
+        # Qt's native move request than by manually calling move() on mouse move.
+        if IS_LINUX and handle and handle.startSystemMove():
+            self._drag_position = None
+            return
+        
+        self._drag_position = global_pos - self.frameGeometry().topLeft()
     
     def _get_resize_edge(self, pos: QPoint) -> str:
         m, r = self.RESIZE_MARGIN, self.rect()
