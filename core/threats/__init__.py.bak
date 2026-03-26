@@ -1,0 +1,332 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+威胁检测模块 - 备份文件 2026-03-24
+配置文件位置：EXE同级目录的 config/threats/ 下
+"""
+
+import os
+import sys
+import json
+from dataclasses import dataclass
+from typing import Optional, List, Dict
+from enum import IntEnum
+
+
+class RiskLevel(IntEnum):
+    """风险等级"""
+    NORMAL = 0
+    LOW = 1
+    MEDIUM = 2
+    HIGH = 3
+    CRITICAL = 4
+
+
+RISK_LABELS = {
+    RiskLevel.NORMAL: ("正常", "#4ADE80"),
+    RiskLevel.LOW: ("低风险", "#FBBF24"),
+    RiskLevel.MEDIUM: ("中风险", "#FB923C"),
+    RiskLevel.HIGH: ("高风险", "#F87171"),
+    RiskLevel.CRITICAL: ("威胁", "#A855F7"),
+}
+
+
+@dataclass
+class ThreatInfo:
+    """威胁信息"""
+    risk_level: RiskLevel
+    risk_label: str
+    risk_color: str
+    description: str = ""
+    threat_type: str = ""
+
+
+def get_config_dir():
+    """获取配置目录 - EXE同级目录下的config文件夹"""
+    if getattr(sys, 'frozen', False):
+        # 打包后：EXE同级目录
+        exe_dir = os.path.dirname(sys.executable)
+        return os.path.join(exe_dir, 'config')
+    else:
+        # 开发时：项目目录
+        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(project_dir, 'config')
+
+
+class ThreatDatabase:
+    """威胁数据库"""
+    
+    DEFAULT_THREATS = {
+        "version": "2026-03-18",
+        "malicious_ips": [
+            "45.33.32.156",
+            "185.220.101.34",
+            "91.121.87.18",
+            "104.244.72.115",
+            "185.56.80.65",
+        ],
+        "suspicious_ports": [
+            4444, 5555, 6667, 1234, 31337, 4443, 5554, 9999,
+        ],
+        "risk_processes": {
+            "xmrig.exe": ["cryptominer", 4],
+            "minerd.exe": ["cryptominer", 4],
+            "cpuminer.exe": ["cryptominer", 4],
+            "nc.exe": ["backdoor", 4],
+            "ncat.exe": ["backdoor", 3],
+            "psexec.exe": ["lateral_movement", 3],
+            "mimikatz.exe": ["credential_theft", 4],
+            "procdump.exe": ["credential_theft", 3],
+            "powersploit.exe": ["exploit", 4],
+            "meterpreter.exe": ["backdoor", 4],
+            "darkcomet.exe": ["rat", 4],
+            "poisonivy.exe": ["rat", 4],
+            "netcat.exe": ["backdoor", 4],
+            "worm.exe": ["worm", 4],
+            "keylogger.exe": ["spyware", 4],
+            "teamviewer.exe": ["remote_access", 2],
+            "anydesk.exe": ["remote_access", 2],
+            "vnc.exe": ["remote_access", 2],
+            "Tor.exe": ["anonymizer", 2],
+        },
+        "suspicious_connections": {
+            "tor_nodes": [9001, 9030, 9050, 9051],
+            "bitcoin": [8333, 8332, 18333],
+            "miner_pools": [3333, 4444, 5555, 7777, 8888, 9999],
+        },
+        "safe_processes": [
+            "chrome.exe", "firefox.exe", "msedge.exe", "iexplore.exe",
+            "explorer.exe", "svchost.exe", "csrss.exe", "lsass.exe",
+            "winlogon.exe", "services.exe", "dwm.exe", "taskmgr.exe",
+            "notepad.exe", "calc.exe", "word.exe", "excel.exe",
+            "outlook.exe", "teams.exe", "zoom.exe", "discord.exe",
+            "wechat.exe", "qq.exe", "tim.exe", "dingtalk.exe",
+            "code.exe", "idea64.exe", "pycharm64.exe", "devenv.exe",
+            "python.exe", "pythonw.exe", "node.exe", "npm.exe",
+        ]
+    }
+    
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._init()
+        return cls._instance
+    
+    def _init(self):
+        self.config_dir = get_config_dir()
+        self.threats_dir = os.path.join(self.config_dir, 'threats')
+        self.db_path = os.path.join(self.threats_dir, 'threat_db.json')
+        self._threats = None
+        self._load_database()
+    
+    def _load_database(self):
+        """加载威胁数据库"""
+        os.makedirs(self.threats_dir, exist_ok=True)
+        
+        if os.path.exists(self.db_path):
+            try:
+                with open(self.db_path, 'r', encoding='utf-8') as f:
+                    self._threats = json.load(f)
+                return
+            except:
+                pass
+        
+        # 使用默认数据库
+        self._threats = self.DEFAULT_THREATS.copy()
+        self._save_database()
+    
+    def _save_database(self):
+        """保存威胁数据库"""
+        os.makedirs(self.threats_dir, exist_ok=True)
+        with open(self.db_path, 'w', encoding='utf-8') as f:
+            json.dump(self._threats, f, indent=2, ensure_ascii=False)
+    
+    def get_version(self) -> str:
+        return self._threats.get('version', 'unknown')
+    
+    def get_db_path(self) -> str:
+        return self.db_path
+    
+    def update_database(self, new_data: dict) -> bool:
+        try:
+            self._threats = new_data
+            self._save_database()
+            return True
+        except Exception:
+            return False
+    
+    def analyze_process(self, process_name: str, pid: int = 0) -> ThreatInfo:
+        """分析进程风险"""
+        process_name_lower = process_name.lower()
+        
+        # 白名单检查
+        safe_processes = self._threats.get('safe_processes', [])
+        if process_name_lower in [p.lower() for p in safe_processes]:
+            return ThreatInfo(
+                risk_level=RiskLevel.NORMAL,
+                risk_label=RISK_LABELS[RiskLevel.NORMAL][0],
+                risk_color=RISK_LABELS[RiskLevel.NORMAL][1],
+                description="已知安全进程"
+            )
+        
+        # 风险进程检查
+        risk_processes = self._threats.get('risk_processes', {})
+        for risk_name, info in risk_processes.items():
+            if risk_name.lower() == process_name_lower:
+                threat_type, level = info
+                risk_level = RiskLevel(level)
+                return ThreatInfo(
+                    risk_level=risk_level,
+                    risk_label=RISK_LABELS[risk_level][0],
+                    risk_color=RISK_LABELS[risk_level][1],
+                    description=f"检测到风险进程: {threat_type}",
+                    threat_type=threat_type
+                )
+        
+        return ThreatInfo(
+            risk_level=RiskLevel.LOW,
+            risk_label=RISK_LABELS[RiskLevel.LOW][0],
+            risk_color=RISK_LABELS[RiskLevel.LOW][1],
+            description="未知进程"
+        )
+    
+    def analyze_connection(self, remote_ip: str, remote_port: int, 
+                          process_name: str = "") -> ThreatInfo:
+        """分析连接风险"""
+        # 恶意IP检查
+        malicious_ips = self._threats.get('malicious_ips', [])
+        if remote_ip in malicious_ips:
+            return ThreatInfo(
+                risk_level=RiskLevel.CRITICAL,
+                risk_label=RISK_LABELS[RiskLevel.CRITICAL][0],
+                risk_color=RISK_LABELS[RiskLevel.CRITICAL][1],
+                description=f"连接到已知恶意IP: {remote_ip}",
+                threat_type="malicious_ip"
+            )
+        
+        # 可疑端口检查
+        suspicious_ports = self._threats.get('suspicious_ports', [])
+        if remote_port in suspicious_ports:
+            return ThreatInfo(
+                risk_level=RiskLevel.HIGH,
+                risk_label=RISK_LABELS[RiskLevel.HIGH][0],
+                risk_color=RISK_LABELS[RiskLevel.HIGH][1],
+                description=f"连接到可疑端口: {remote_port}",
+                threat_type="suspicious_port"
+            )
+        
+        # 矿池端口检查
+        miner_ports = self._threats.get('suspicious_connections', {}).get('miner_pools', [])
+        if remote_port in miner_ports:
+            return ThreatInfo(
+                risk_level=RiskLevel.HIGH,
+                risk_label=RISK_LABELS[RiskLevel.HIGH][0],
+                risk_color=RISK_LABELS[RiskLevel.HIGH][1],
+                description="疑似连接到矿池",
+                threat_type="miner_pool"
+            )
+        
+        # Tor节点检查
+        tor_ports = self._threats.get('suspicious_connections', {}).get('tor_nodes', [])
+        if remote_port in tor_ports:
+            return ThreatInfo(
+                risk_level=RiskLevel.MEDIUM,
+                risk_label=RISK_LABELS[RiskLevel.MEDIUM][0],
+                risk_color=RISK_LABELS[RiskLevel.MEDIUM][1],
+                description="疑似Tor网络连接",
+                threat_type="tor_connection"
+            )
+        
+        return ThreatInfo(
+            risk_level=RiskLevel.NORMAL,
+            risk_label=RISK_LABELS[RiskLevel.NORMAL][0],
+            risk_color=RISK_LABELS[RiskLevel.NORMAL][1],
+            description="正常连接"
+        )
+
+
+class ThreatUpdater:
+    """威胁库更新器 - 旧版本备份"""
+    
+    DEFAULT_UPDATE_URL = "https://raw.githubusercontent.com/openclaw/netsentry-threats/main/threat_db.json"
+    
+    FALLBACK_URLS = [
+        "https://cdn.jsdelivr.net/gh/openclaw/netsentry-threats@main/threat_db.json",
+        "https://mirror.ghproxy.com/https://raw.githubusercontent.com/openclaw/netsentry-threats/main/threat_db.json",
+    ]
+    
+    def __init__(self, database: ThreatDatabase):
+        self.database = database
+        self.update_url = self._load_update_url()
+    
+    def _load_update_url(self) -> str:
+        config_path = os.path.join(get_config_dir(), 'update_source.txt')
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    url = f.read().strip()
+                    if url and url.startswith('http'):
+                        return url
+            except:
+                pass
+        return self.DEFAULT_UPDATE_URL
+    
+    def check_update(self) -> tuple:
+        try:
+            import urllib.request
+            import ssl
+            
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            
+            with urllib.request.urlopen(self.update_url, timeout=10, context=ctx) as response:
+                remote_data = json.loads(response.read().decode('utf-8'))
+                remote_ver = remote_data.get('version', '0')
+            
+            local_ver = self.database.get_version()
+            has_update = remote_ver > local_ver
+            
+            return (has_update, remote_ver, None)
+            
+        except Exception as e:
+            return (False, None, str(e))
+    
+    def download_update(self) -> tuple:
+        import urllib.request
+        import ssl
+        
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        
+        urls_to_try = [self.update_url] + [u for u in self.FALLBACK_URLS if u != self.update_url]
+        
+        for url in urls_to_try:
+            try:
+                with urllib.request.urlopen(url, timeout=30, context=ctx) as response:
+                    data = response.read().decode('utf-8')
+                    new_threats = json.loads(data)
+                    
+                    if 'version' not in new_threats:
+                        continue
+                    
+                    if self.database.update_database(new_threats):
+                        return (True, f"更新成功！版本: {new_threats['version']}")
+                    else:
+                        return (False, "保存更新失败")
+                    
+            except Exception as e:
+                continue
+        
+        return (False, "无法连接到更新服务器，请检查网络连接")
+
+
+def get_threat_database() -> ThreatDatabase:
+    return ThreatDatabase()
+
+
+def get_threat_updater() -> ThreatUpdater:
+    return ThreatUpdater(get_threat_database())
