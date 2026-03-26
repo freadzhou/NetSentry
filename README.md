@@ -6,6 +6,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 ![Python](https://img.shields.io/badge/python-3.10+-green)
 
+<img width="800" height="800" alt="fread_logo" src="https://github.com/user-attachments/assets/a1fc155d-5663-421a-8b37-974ab9bde972" />
 
 ---
 
