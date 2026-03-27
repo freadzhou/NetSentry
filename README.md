@@ -2,12 +2,11 @@
 
 **网络安全监控工具** - 轻量级进程网络活动监控
 
-![Version](https://img.shields.io/badge/version-1.7.1-blue)
+![Version](https://img.shields.io/badge/version-1.7.2-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 ![Python](https://img.shields.io/badge/python-3.10+-green)
 
-<img width="800" height="800" alt="fread_logo" src="https://github.com/user-attachments/assets/62394aa4-2212-4e02-9a9e-252c0c044652" />
-
+![fread_logo](fread_logo.png)
 
 ---
 
@@ -33,11 +32,12 @@
 
 ## 📥 安装使用
 
-### 方式一：直接运行EXE（推荐）
+### 方式一：Windows 直接运行EXE（推荐）
 
-1. 解压发布包
-2. 确保 `config` 文件夹与 `NetSentry.exe` 在同一目录
-3. 双击 `NetSentry.exe` 运行
+1. 从 [Releases](https://github.com/freadz/NetSentry/releases) 下载最新版本
+2. 解压发布包
+3. 确保 `config` 文件夹与 `NetSentry.exe` 在同一目录
+4. 双击 `NetSentry.exe` 运行
 
 ```
 NetSentry/
@@ -47,13 +47,74 @@ NetSentry/
         └── threat_db.json
 ```
 
-### 方式二：从源码运行
+### 方式二：从源码运行（Windows / Linux / macOS）
+
+#### 前置要求
+
+- Python 3.10 或更高版本
+- [uv](https://docs.astral.sh/uv/) 包管理器
+
+#### 安装 uv
+
+**Windows (PowerShell):**
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+**Linux / macOS:**
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+#### 运行程序
+
+```bash
+# 克隆仓库
+git clone https://github.com/freadz/NetSentry.git
+cd NetSentry
+
+# 安装依赖并运行（uv 会自动处理所有依赖）
+uv run python run.py
+```
+
+#### Linux 特别说明
+
+Linux 上主题切换按钮显示文字（Dark/Light）而非 emoji，这是为了兼容性。
+
+### 方式三：打包为可执行文件
+
+#### Windows 打包
 
 ```bash
 cd NetSentry
-uv install
-uv run python run.py
+uv run python build_exe.py
 ```
+
+生成的 `NetSentry.exe` 位于 `dist/` 目录下。
+
+#### Linux 打包
+
+```bash
+cd NetSentry
+
+# 安装依赖
+uv sync
+
+# 打包（需要安装 PyInstaller）
+uv run pyinstaller run.py \
+    --name=NetSentry \
+    --onefile \
+    --windowed \
+    --clean \
+    --noconfirm \
+    --hidden-import=PyQt6 \
+    --hidden-import=psutil \
+    --collect-all=PyQt6
+
+# 生成的可执行文件在 dist/ 目录
+```
+
+**注意**：Linux 打包需要系统已安装相关图形库（如 PyQt6 的依赖）。
 
 ---
 
@@ -234,6 +295,11 @@ NetSentry/
 ---
 
 ## 📋 更新日志
+
+### v1.7.2 (2026-03-27)
+- ✅ 更新 pyproject.toml，添加项目元数据
+- ✅ 更新 README，细化安装和运行说明
+- ✅ 添加 Linux 打包说明
 
 ### v1.7.1 (2026-03-26)
 - ✅ 修复 Windows 上拖动窗口导致程序闪退的问题

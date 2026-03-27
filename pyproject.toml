@@ -1,11 +1,33 @@
 [project]
 name = "netsentry"
-version = "0.1.0"
-description = "Add your description here"
+version = "1.7.2"
+description = "轻量级网络连接监控工具，实时监控进程网络活动，支持威胁检测"
 readme = "README.md"
-requires-python = ">=3.10.20"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Fread.Z"}
+]
+keywords = ["network", "monitor", "security", "pyqt6", "threat-detection"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: System :: Monitoring",
+]
 dependencies = [
     "psutil>=7.2.2",
     "pyinstaller>=6.19.0",
     "pyqt6>=6.10.2",
 ]
+
+[project.urls]
+Homepage = "https://github.com/freadz/NetSentry"
+Repository = "https://github.com/freadz/NetSentry"
