@@ -877,7 +877,7 @@ class MainContent(QWidget):
         
         bottom_layout.addStretch()
         
-        self.version_label = QLabel("NetSentry v1.7.1")
+        self.version_label = QLabel("NetSentry v1.7.2")
         self.version_label.setFont(Fonts.SMALL())
         bottom_layout.addWidget(self.version_label)
         
