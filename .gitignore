@@ -1,0 +1,15 @@
+# 忽略所有 Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 忽略其他常见的 Python 产物
+.venv/
+env/
+venv/
+.pytest_cache/
+.coverage
+dist/
+build/
+*.egg-info
