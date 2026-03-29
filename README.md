@@ -35,7 +35,7 @@
 
 ### 方式一：Windows 直接运行EXE（推荐）
 
-1. 从 [Releases](https://github.com/freadz/NetSentry/releases) 下载最新版本
+1. 从 [Releases](https://github.com/freadzhou/NetSentry/releases/tag/NetSentry) 下载最新版本
 2. 解压发布包
 3. 确保 `config` 文件夹与 `NetSentry.exe` 在同一目录
 4. 双击 `NetSentry.exe` 运行
